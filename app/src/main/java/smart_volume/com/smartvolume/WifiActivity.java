@@ -3,33 +3,22 @@ package smart_volume.com.smartvolume;
 import android.app.Activity;
 import android.content.SharedPreferences;
 import android.media.AudioManager;
-import android.net.wifi.WifiInfo;
 import android.os.Bundle;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.ArrayAdapter;
 import android.widget.SeekBar;
 import android.widget.Spinner;
-import android.widget.TextView;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import android.content.BroadcastReceiver;
+
 import android.content.Context;
-import android.content.Intent;
-import android.content.IntentFilter;
-import android.net.wifi.ScanResult;
 import android.net.wifi.WifiConfiguration;
 import android.net.wifi.WifiManager;
-import android.os.Bundle;
-import android.util.Log;
 import android.view.View;
 import android.view.View.OnClickListener;
-import android.widget.AdapterView;
 import android.widget.Button;
-import android.widget.ListView;
-import android.widget.SimpleAdapter;
 import android.widget.Toast;
 
 
@@ -37,8 +26,10 @@ public class WifiActivity extends Activity {
 
     private WifiManager wifi;
     private Spinner spinner;
+    private Spinner spinner2;
     private Button btnSubmit;
     private SeekBar volumeControl = null;
+    private SeekBar volumeControl2 = null;
     private SeekBar defaultVolumeControl = null;
     private SharedPreferences sharedPref;
 
@@ -47,35 +38,54 @@ public class WifiActivity extends Activity {
 
         super.onCreate(savedInstanceState);
 
-        configPreferences();
         configWifiService();
+
+        if (!wifi.isWifiEnabled()) {
+            wifi.setWifiEnabled(true);
+            toastEnableWifi();
+        }
+
+        configPreferences();
 
         setContentView(R.layout.activity_wifi);
 
         List<String> wifis = new ArrayList<String>();
-        if (wifi.getConfiguredNetworks() != null){
-            for(WifiConfiguration network : wifi.getConfiguredNetworks()) {
-                String wifi_name = network.SSID.substring(1, network.SSID.length() - 1);
-                wifis.add(wifi_name);
+        if (wifi.getConfiguredNetworks() != null) {
+            for (WifiConfiguration network : wifi.getConfiguredNetworks()) {
+                wifis.add(WifiHelper.wifiName(network));
             }
         }
 
-        String wifi_saved = getWifiSaved();
+        ArrayAdapter<String> adapter = new ArrayAdapter<String>(this,
+                android.R.layout.simple_spinner_item, wifis);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
 
         spinner = (Spinner) findViewById(R.id.wifis_spinner);
-        ArrayAdapter<String> adapter = new ArrayAdapter<String>(this,
-        android.R.layout.simple_spinner_item, wifis);
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spinner.setAdapter(adapter);
-        spinner.setSelection(adapter.getPosition(wifi_saved));
+        spinner.setSelection(adapter.getPosition(getWifiSaved()));
+
+        spinner2 = (Spinner) findViewById(R.id.wifis_spinner2);
+        spinner2.setAdapter(adapter);
+        spinner2.setSelection(adapter.getPosition(getWifiSaved(2)));
 
         addListenerOnButton();
 
         volumeControl = (SeekBar) findViewById(R.id.volume_bar);
         volumeControl.setProgress(volumeToPercentenge(getVolumeSaved()));
 
+        volumeControl2 = (SeekBar) findViewById(R.id.volume_bar2);
+        volumeControl2.setProgress(volumeToPercentenge(getVolumeSaved(2)));
+
         defaultVolumeControl = (SeekBar) findViewById(R.id.default_volume_bar);
         defaultVolumeControl.setProgress(volumeToPercentenge(getDefaultVolumeSaved()));
+    }
+
+    private void toastEnableWifi() {
+        Toast.makeText(
+                WifiActivity.this,
+                getString(R.string.enable_wifi),
+                Toast.LENGTH_LONG
+        ).show();
     }
 
     public void configPreferences() {
@@ -87,7 +97,7 @@ public class WifiActivity extends Activity {
     }
 
     public String getCurrentWifiName(){
-        return wifi.getConnectionInfo().getSSID().substring(1, wifi.getConnectionInfo().getSSID().length() - 1);
+        return WifiHelper.wifiName(wifi.getConnectionInfo());
     }
 
     public void addListenerOnButton() {
@@ -101,12 +111,15 @@ public class WifiActivity extends Activity {
             @Override
             public void onClick(View v) {
                 String wifi_selected = String.valueOf(spinner.getSelectedItem());
+                String wifi2_selected = String.valueOf(spinner2.getSelectedItem());
 
 //                SharedPreferences sharedPref = getPreferences(Context.MODE_PRIVATE);
                 SharedPreferences sharedPref = getSharedPreferences(getString(R.string.database), Context.MODE_PRIVATE);
                         SharedPreferences.Editor editor = sharedPref.edit();
                 editor.putString(getString(R.string.wifi), wifi_selected);
+                editor.putString(getString(R.string.wifi)+"2", wifi2_selected);
                 editor.putInt(getString(R.string.volume), percentengeToVolume(volumeControl.getProgress()));
+                editor.putInt(getString(R.string.volume)+"2", percentengeToVolume(volumeControl2.getProgress()));
                 editor.putInt(getString(R.string.default_volume), percentengeToVolume(defaultVolumeControl.getProgress()));
                 editor.commit();
 
@@ -146,11 +159,27 @@ public class WifiActivity extends Activity {
     }
 
     public String getWifiSaved() {
-        return sharedPref.getString(getString(R.string.wifi), null);
+        return getWifiSaved(null);
+    }
+
+    public String getWifiSaved(Integer id) {
+        if (id == null) {
+            return sharedPref.getString(getString(R.string.wifi), null);
+        } else {
+            return sharedPref.getString(getString(R.string.wifi) + id.toString(), null);
+        }
     }
 
     public int getVolumeSaved() {
-        return sharedPref.getInt(getString(R.string.volume), 0);
+        return getVolumeSaved(null);
+    }
+
+    public int getVolumeSaved(Integer id) {
+        if (id == null) {
+            return sharedPref.getInt(getString(R.string.volume), 0);
+        } else {
+            return sharedPref.getInt(getString(R.string.volume) + id.toString(), 0);
+        }
     }
 
     public int getDefaultVolumeSaved() {
