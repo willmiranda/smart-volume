@@ -1,16 +1,11 @@
 package smart_volume.com.smartvolume;
 
+import android.app.AlarmManager;
+import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.media.AudioManager;
-import android.media.Ringtone;
-import android.media.RingtoneManager;
-import android.net.ConnectivityManager;
-import android.net.NetworkInfo;
-import android.net.Uri;
-import android.net.wifi.WifiManager;
 import android.net.wifi.p2p.WifiP2pManager;
 import android.widget.Toast;
 
@@ -21,8 +16,9 @@ public class WiFiDirectBroadcastReceiver extends BroadcastReceiver {
     private WifiP2pManager mManager;
     private Channel mChannel;
     private WifiActivity mActivity;
-    private AudioManager audio;
     private SharedPreferences sharedPref;
+    private AlarmManager alarmMgr;
+    private PendingIntent alarmIntent;
 
     public WiFiDirectBroadcastReceiver(){
     };
@@ -36,72 +32,44 @@ public class WiFiDirectBroadcastReceiver extends BroadcastReceiver {
     }
 
     @Override
-    public void onReceive(Context context, Intent intent) {
+    public void onReceive(final Context context, Intent intent) {
 
-        audio = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
-        sharedPref = context.getApplicationContext().getSharedPreferences(context.getString(R.string.database), Context.MODE_PRIVATE);
+        SmartVolumeDAO dao = new SmartVolumeDAO(context);
 
-        WifiManager wifi = (WifiManager) context.getSystemService(Context.WIFI_SERVICE);
+        if (dao.hasChangeVolumeScheduled(context)) {
 
-        ConnectivityManager cm = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
-        NetworkInfo networkInfo = cm.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
+            Toast.makeText(
+                    context,
+                    "Mudanca de status wifi ignorada ...",
+                    Toast.LENGTH_LONG
+            ).show();
 
-        if (networkInfo.isConnected()) {
+        } else {
 
-            String current_wifi = WifiHelper.wifiName(wifi.getConnectionInfo());
+            if (WifiService.isConnected(context)) {
 
-            String wifi_saved = sharedPref.getString(context.getString(R.string.wifi), null);
-            String wifi2_saved = sharedPref.getString(context.getString(R.string.wifi) + "2", null);
+                ChangeVolumeService.changeAccordingWifi(context);
 
-            if (current_wifi != null) {
-                if (wifi_saved != null && wifi_saved.equals(current_wifi)) {
-                    setVolumeSaved(context, null);
-                } else if (wifi2_saved != null && wifi2_saved.equals(current_wifi)) {
-                    setVolumeSaved(context, 2);
-                }
             } else {
-                setDefaultVolume(context);
+
+                int delay = 20000;
+                long changeVolumeAt = System.currentTimeMillis() + delay;
+
+                Intent intentVolumeReceiver = new Intent(context, ScheduleVolumeReceiver.class);
+                alarmIntent = PendingIntent.getBroadcast(context, 0, intentVolumeReceiver, 0);
+
+                alarmMgr = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
+                alarmMgr.set(AlarmManager.RTC_WAKEUP, changeVolumeAt, alarmIntent);
+
+                dao.saveChangeVolumeSchedule(changeVolumeAt);
+                dao.saveLastWifiConnected(WifiService.getCurrentWifiName(context));
+
+                Toast.makeText(
+                        context,
+                        "O volume será alterado daqui "+(delay/1000)+" segundos",
+                        Toast.LENGTH_LONG
+                ).show();
             }
-
-            playNotification(context);
-
-        } else {
-            setDefaultVolume(context);
         }
-    }
-
-    private void playNotification(Context context) {
-        try {
-            Uri notification = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
-            Ringtone r = RingtoneManager.getRingtone(context.getApplicationContext(), notification);
-            r.play();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-    private void setVolumeSaved(Context context, Integer volume_id) {
-        int volume_saved;
-        if (volume_id == null) {
-            volume_saved = sharedPref.getInt(context.getString(R.string.volume), 0);
-        } else {
-            volume_saved = sharedPref.getInt(context.getString(R.string.volume) + volume_id.toString(), 0);
-        }
-        audio.setStreamVolume(AudioManager.STREAM_RING, volume_saved, AudioManager.FLAG_SHOW_UI);
-        Toast.makeText(
-                context,
-                context.getString(R.string.volumes_updated),
-                Toast.LENGTH_LONG
-        ).show();
-    }
-
-    private void setDefaultVolume(Context context) {
-        int default_volume_saved = sharedPref.getInt(context.getString(R.string.default_volume), 0);
-        audio.setStreamVolume(AudioManager.STREAM_RING, default_volume_saved, AudioManager.FLAG_SHOW_UI);
-        Toast.makeText(
-                context,
-                context.getString(R.string.volumes_updated),
-                Toast.LENGTH_LONG
-        ).show();
     }
 }

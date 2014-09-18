@@ -113,7 +113,6 @@ public class WifiActivity extends Activity {
                 String wifi_selected = String.valueOf(spinner.getSelectedItem());
                 String wifi2_selected = String.valueOf(spinner2.getSelectedItem());
 
-//                SharedPreferences sharedPref = getPreferences(Context.MODE_PRIVATE);
                 SharedPreferences sharedPref = getSharedPreferences(getString(R.string.database), Context.MODE_PRIVATE);
                         SharedPreferences.Editor editor = sharedPref.edit();
                 editor.putString(getString(R.string.wifi), wifi_selected);

@@ -14,5 +14,6 @@
     <string name="volumes_updated">Volume ringtone and notifications updated</string>
     <string name="saved">Volume configuration saved</string>
     <string name="database">volumePrefs</string>
+    <string name="schedule">scheduleChangeVolume</string>
 
 </resources>
